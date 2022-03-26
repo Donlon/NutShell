@@ -407,6 +407,7 @@ class EmbeddedTLBEmpty(implicit val tlbConfig: TLBConfig) extends TlbModule {
 }
 
 class EmbeddedTLB_fake(implicit val tlbConfig: TLBConfig) extends TlbModule with HasTLBIO {
+  io.mem <> DontCare
   io.out <> io.in
   io.csrMMU.loadPF := false.B
   io.csrMMU.storePF := false.B
@@ -427,9 +428,9 @@ object EmbeddedTLB {
     } else {
       val tlb = Module(new EmbeddedTLB_fake)
       tlb.io.in <> in
+      tlb.io.mem <> mem
       tlb.io.flush := flush
       tlb.io.csrMMU <> csrMMU
-      mem := DontCare
       tlb
     }
   }
