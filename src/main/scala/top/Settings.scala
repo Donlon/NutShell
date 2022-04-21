@@ -50,8 +50,8 @@ object PynqSettings {
     "ResetVector" -> 0x80000000L,
     "MemMapBase" -> 0x0000000000000000L,
     "MemMapRegionBits" -> 0,
-    "MMIOBase" -> 0x00000000e0000000L,
-    "MMIOSize" -> 0x0000000020000000L,
+    "MMIOBase" -> 0x00000000c0000000L,
+    "MMIOSize" -> 0x0000000040000000L,
     "HasDTLB" -> false,
     "HasITLB" -> false,
     "MmodeOnly" -> true
