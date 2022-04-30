@@ -22,6 +22,7 @@ import chisel3.util._
 import utils._
 
 class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Module {
+  // TODO: support overlapped address range
   val io = IO(new Bundle {
     val in = Flipped(new SimpleBusUC)
     val out = Vec(addressSpace.length, new SimpleBusUC)
@@ -35,13 +36,14 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   val outSelVec = VecInit(addressSpace.map(
     addressList =>
       addressList.map(range => addr >= range._1.U && addr < (range._1 + range._2).U).reduce(_ || _)
-  ))
+  )) // TODO: make bits in this signal exclusive
   val outSelIdx = PriorityEncoder(outSelVec)
   val outSel = io.out(outSelIdx)
   val outSelIdxResp = RegEnable(outSelIdx, outSel.req.fire() && (state === s_idle))
   val outSelResp = io.out(outSelIdxResp)
   val reqInvalidAddr = io.in.req.valid && !outSelVec.asUInt.orR
 
+  // Why AND reduced?
   when((io.in.req.valid && !outSelVec.asUInt.orR) || (io.in.req.valid && outSelVec.asUInt.andR)){
     Debug(){
       printf("crossbar access bad addr %x, time %d\n", addr, GTimer())
@@ -51,11 +53,11 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   assert(!(io.in.req.valid && outSelVec.asUInt.andR), "address decode error, bad addr = 0x%x\n", addr)
 
   // bind out.req channel
-  (io.out zip outSelVec).map { case (o, v) => {
-    o.req.bits := io.in.req.bits
-    o.req.valid := v && (io.in.req.valid && (state === s_idle))
-    o.resp.ready := v
-  }}
+  for (i <- 0 until io.out.length) {
+    val outBus = io.out(i)
+    outBus.req.bits := io.in.req.bits
+    outBus.req.valid := outSelIdx === i.U && (io.in.req.valid && (state === s_idle))
+  }
 
   switch (state) {
     is (s_idle) { 
@@ -70,9 +72,7 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   io.in.resp.bits <> outSelResp.resp.bits
   // io.in.resp.bits.exc.get := state === s_error
   for (i <- 0 until io.out.length) {
-    when (outSelIdx === i.U && !reqInvalidAddr) {
-      io.out(i).resp.ready := io.in.resp.ready
-    }
+    io.out(i).resp.ready := Mux(outSelIdx === i.U && !reqInvalidAddr, io.in.resp.ready, 0.U)
   }
   io.in.req.ready := outSel.req.ready || reqInvalidAddr
 
