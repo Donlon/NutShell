@@ -76,9 +76,8 @@ object AddressSpace extends HasNutCoreParameter {
   // (start, size)
   // address out of MMIO will be considered as DRAM
   def mmio = List(
-    (0x10000000L, 0x10000000L),
-    // (0xd0000000L, 0x10000000L),  // internal devices, such as CLINT and PLIC
-    (Settings.getLong("MMIOBase"), Settings.getLong("MMIOSize")) // external devices
+    (0x00000000L, 0x40000000L),
+    (Settings.getLong("MMIOBase"), Settings.getLong("MMIOSize")) // external devices, and internal devices such as CLINT and PLIC
   )
 
   def isMMIO(addr: UInt) = mmio.map(range => {
