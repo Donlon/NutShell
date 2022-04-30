@@ -21,7 +21,7 @@ import chisel3.util._
 
 import utils._
 
-class SimpleBusCrossbar1toN(addressSpace: List[(Long, Long)]) extends Module {
+class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Module {
   val io = IO(new Bundle {
     val in = Flipped(new SimpleBusUC)
     val out = Vec(addressSpace.length, new SimpleBusUC)
@@ -33,7 +33,9 @@ class SimpleBusCrossbar1toN(addressSpace: List[(Long, Long)]) extends Module {
   // select the output channel according to the address
   val addr = io.in.req.bits.addr
   val outSelVec = VecInit(addressSpace.map(
-    range => (addr >= range._1.U && addr < (range._1 + range._2).U)))
+    addressList =>
+      addressList.map(range => addr >= range._1.U && addr < (range._1 + range._2).U).reduce(_ || _)
+  ))
   val outSelIdx = PriorityEncoder(outSelVec)
   val outSel = io.out(outSelIdx)
   val outSelIdxResp = RegEnable(outSelIdx, outSel.req.fire() && (state === s_idle))
@@ -129,7 +131,7 @@ class SimpleBusCrossbarNto1(n: Int, userBits:Int = 0) extends Module {
   }
 }
 
-class SimpleBusCrossbar(n: Int, addressSpace: List[(Long, Long)]) extends Module {
+class SimpleBusCrossbar(n: Int, addressSpace: List[List[(Long, Long)]]) extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Vec(n, new SimpleBusUC))
     val out = Vec(addressSpace.length, new SimpleBusUC)

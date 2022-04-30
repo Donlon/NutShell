@@ -32,14 +32,14 @@ class SimMMIO extends Module {
     val uart = new UARTIO
   })
 
-  val devAddrSpace = List(
-    (0x40600000L, 0x10L), // uart
-    (0x50000000L, 0x400000L), // vmem
-    (0x40001000L, 0x8L),  // vga ctrl
-    (0x40000000L, 0x1000L),  // flash
-    (0x40002000L, 0x1000L), // dummy sdcard
-    (0x40004000L, 0x1000L), // meipGen
-    (0x40003000L, 0x1000L)  // dma
+  val devAddrSpace : List[List[(Long, Long)]] = List(
+    List((0x40600000L, 0x10L)), // uart
+    List((0x50000000L, 0x400000L)), // vmem
+    List((0x40001000L, 0x8L)),  // vga ctrl
+    List((0x40000000L, 0x1000L)),  // flash
+    List((0x40002000L, 0x1000L)), // dummy sdcard
+    List((0x40004000L, 0x1000L)), // meipGen
+    List((0x40003000L, 0x1000L))  // dma
   )
 
   val xbar = Module(new SimpleBusCrossbar1toN(devAddrSpace))
