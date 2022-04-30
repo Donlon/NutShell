@@ -44,7 +44,7 @@ class ILABundle extends NutCoreBundle {
 class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParameter {
   val io = IO(new Bundle{
     val mem = new AXI4
-    val mmio = (if (p.FPGAPlatform) { new AXI4 } else { new SimpleBusUC })
+    val mmio = (if (p.FPGAPlatform) { new AXI4Lite } else { new SimpleBusUC })
     val frontend = Flipped(new AXI4)
     val meip = Input(UInt(Settings.getInt("NrExtIntr").W))
     val ila = if (p.FPGAPlatform && EnableILA) Some(Output(new ILABundle)) else None
@@ -107,7 +107,7 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
   mmioXbar.io.in <> nutcore.io.mmio
 
   val extDev = mmioXbar.io.out(2)
-  if (p.FPGAPlatform) { io.mmio <> extDev.toAXI4() }
+  if (p.FPGAPlatform) { io.mmio <> extDev.toAXI4Lite() }
   else { io.mmio <> extDev }
 
   val clint = Module(new AXI4CLINT(sim = !p.FPGAPlatform))
