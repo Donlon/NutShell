@@ -69,7 +69,11 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   io.in.resp.valid := outSelResp.resp.fire() || state === s_error
   io.in.resp.bits <> outSelResp.resp.bits
   // io.in.resp.bits.exc.get := state === s_error
-  outSelResp.resp.ready := io.in.resp.ready
+  for (i <- 0 until io.out.length) {
+    when (outSelIdx === i.U && !reqInvalidAddr) {
+      io.out(i).resp.ready := io.in.resp.ready
+    }
+  }
   io.in.req.ready := outSel.req.ready || reqInvalidAddr
 
   Debug() {
