@@ -418,20 +418,15 @@ class EmbeddedTLB_fake(implicit val tlbConfig: TLBConfig) extends TlbModule with
 
 object EmbeddedTLB {
   def apply(in: SimpleBusUC, mem: SimpleBusUC, flush: Bool, csrMMU: MMUIO, enable: Boolean = true)(implicit tlbConfig: TLBConfig) = {
-    if (enable) {
-      val tlb = Module(new EmbeddedTLB)
-      tlb.io.in <> in
-      tlb.io.mem <> mem
-      tlb.io.flush := flush
-      tlb.io.csrMMU <> csrMMU
-      tlb
+    val tlb = if (enable) {
+      Module(new EmbeddedTLB)
     } else {
-      val tlb = Module(new EmbeddedTLB_fake)
-      tlb.io.in <> in
-      tlb.io.mem <> mem
-      tlb.io.flush := flush
-      tlb.io.csrMMU <> csrMMU
-      tlb
+      Module(new EmbeddedTLB_fake)
     }
+    tlb.io.in <> in
+    tlb.io.mem <> mem
+    tlb.io.flush := flush
+    tlb.io.csrMMU <> csrMMU
+    tlb
   }
 }
