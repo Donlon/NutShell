@@ -34,13 +34,14 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   // select the output channel according to the address
   val addr = io.in.req.bits.addr
   val outMatchVec = VecInit(addressSpace.map(_.map(IsAddressMatched(addr, _)).reduce(_ || _)))
-  // one-hot encoded, but can be all zero if fails to decode address
   val outSelVec = VecInit(PriorityEncoderOH(outMatchVec))
-  val outSelRespVec = RegEnable(next=outSelVec, init=VecInit(Seq.fill(outSelVec.length)(false.B)), enable=io.in.req.fire())
+  val outSelRespVec = RegEnable(next=outSelVec,
+                                init=VecInit(Seq.fill(outSelVec.length)(false.B)),
+                                enable=io.in.req.fire() && state === s_idle)
   val reqInvalidAddr = io.in.req.valid && !outSelVec.asUInt.orR
 
   when (reqInvalidAddr) {
-    Debug(){
+    Debug() {
       printf("crossbar access bad addr %x, time %d\n", addr, GTimer())
     }
   }
@@ -75,7 +76,7 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
       printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.req: ${io.in.req.bits}\n")
     }
     when (io.in.resp.fire()) {
-      printf(p"${GTimer()}: xbar: outSelVec= ${outSelVec}, outSel.resp: ${io.in.resp.bits}\n")
+      printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.resp: ${io.in.resp.bits}\n")
     }
   }
 }
