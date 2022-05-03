@@ -80,11 +80,7 @@ object AddressSpace extends HasNutCoreParameter {
     (Settings.getLong("MMIOBase"), Settings.getLong("MMIOSize")) // external devices, and internal devices such as CLINT and PLIC
   )
 
-  def isMMIO(addr: UInt) = mmio.map(range => {
-    require(isPow2(range._2))
-    val bits = log2Up(range._2)
-    (addr ^ range._1.U)(PAddrBits-1, bits) === 0.U
-  }).reduce(_ || _)
+  def isMMIO(addr: UInt) = mmio.map(IsAddressMatched(addr, _)).reduce(_ || _)
 }
 
 class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {

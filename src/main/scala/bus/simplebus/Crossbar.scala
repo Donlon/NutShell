@@ -21,6 +21,7 @@ import chisel3.util._
 
 import utils._
 
+// This module does not support burst transaction
 class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Module {
   val io = IO(new Bundle {
     val in = Flipped(new SimpleBusUC)
@@ -32,14 +33,11 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
 
   // select the output channel according to the address
   val addr = io.in.req.bits.addr
-  val outMatchVec = VecInit(addressSpace.map(
-    addressList =>
-      addressList.map(range => addr >= range._1.U && addr < (range._1 + range._2).U).reduce(_ || _)
-  ))
+  val outMatchVec = VecInit(addressSpace.map(_.map(IsAddressMatched(addr, _)).reduce(_ || _)))
   // one-hot encoded, but can be all zero if fails to decode address
-  val outSelVec = PriorityMux(outMatchVec, Vec(addressSpace.length, io.in.req.valid))
-  val outSelRespVec = RegEnable(next=outSelVec, init=0.U, enable=io.in.req.fire())
-  val reqInvalidAddr = io.in.req.valid && !outSelVec.orR
+  val outSelVec = VecInit(PriorityEncoderOH(outMatchVec))
+  val outSelRespVec = RegEnable(next=outSelVec, init=VecInit(Seq.fill(outSelVec.length)(false.B)), enable=io.in.req.fire())
+  val reqInvalidAddr = io.in.req.valid && !outSelVec.asUInt.orR
 
   when (reqInvalidAddr) {
     Debug(){
@@ -53,7 +51,7 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
       when (io.in.req.fire()) { state := s_resp }
       when (reqInvalidAddr) { state := s_error }
     }
-    is (s_resp) { when (io.in.resp.fire()) { state := s_idle } }
+    is (s_resp) { when (io.in.resp.fire()) { state := s_idle } } // TODO: isReadLast
     is (s_error) { when (io.in.resp.fire()) { state := s_idle } }
   }
 
@@ -103,8 +101,8 @@ class SimpleBusCrossbarNto1(n: Int, userBits:Int = 0) extends Module {
   io.out.req.valid := thisReq.valid && (state === s_idle)
   thisReq.ready := io.out.req.ready && (state === s_idle)
 
-  io.in.map(_.resp.bits := io.out.resp.bits)
-  io.in.map(_.resp.valid := false.B)
+  io.in.foreach(_.resp.bits := io.out.resp.bits)
+  io.in.foreach(_.resp.valid := false.B)
   (io.in(inflightSrc).resp, io.out.resp) match { case (l, r) => {
     l.valid := r.valid
     r.ready := l.ready
