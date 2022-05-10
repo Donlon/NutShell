@@ -19,7 +19,7 @@ object AXI4Parameters extends HasNutCoreParameter {
   val respBits  = 2
 
   // These are not fixed:
-  val idBits    = 1
+  val idBits    = 8
   val addrBits  = PAddrBits
   val dataBits  = DataBits
   val userBits  = 1
