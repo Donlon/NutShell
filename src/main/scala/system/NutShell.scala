@@ -43,7 +43,7 @@ class ILABundle extends NutCoreBundle {
 
 class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParameter {
   val io = IO(new Bundle{
-    val mem = new AXI4
+    val mem = new AXI4(idBits = 1)
     val mmio = (if (p.FPGAPlatform) { new AXI4Lite } else { new SimpleBusUC })
     val frontend = Flipped(new AXI4)
     val meip = Input(UInt(Settings.getInt("NrExtIntr").W))
