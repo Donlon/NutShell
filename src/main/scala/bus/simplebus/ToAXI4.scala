@@ -80,6 +80,7 @@ class AXI42SimpleBusConverter() extends Module {
 
   //将超过8的BURST len拆分为若干个burst len为8的section
   val already_burst_len = RegInit(0.U(8.W))
+  val ar_reg = Reg(new AXI4BundleA(idBits))
 
   // Read Path:第一种：完全重新接收一个命令    第二种：一个8len burst没做完
   when (!isInflight() && axi.ar.valid) {
@@ -95,22 +96,23 @@ class AXI42SimpleBusConverter() extends Module {
     when (mem.req.fire) {
       setState(axi_read, ar.id)
       already_burst_len := already_burst_len + OneTransferSize(ar.len)
+      ar_reg := ar
     }
   }
 
   when (isReadNoBurstAll()) {
     mem.req.valid := true.B
-    req.addr := ar.addr + (already_burst_len << 3)
+    req.addr := ar_reg.addr + (already_burst_len << 3)
     req.cmd := SimpleBusCmd.readBurst
     // TODO: consider ar.burst
-    req.size := ar.size
-    req.user.foreach(_ := ar.user)
+    req.size := ar_reg.size
+    req.user.foreach(_ := ar_reg.user)
     req.wmask := 0.U
     req.wdata := 0.U
 
     when (mem.req.fire) {
-      setState(axi_read, ar.id)
-      already_burst_len := already_burst_len + OneTransferSize(ar.len)
+      setState(axi_read, ar_reg.id)
+      already_burst_len := already_burst_len + OneTransferSize(ar_reg.len)
     }
   }
 
@@ -120,7 +122,7 @@ class AXI42SimpleBusConverter() extends Module {
     r.id := inflight_id_reg
     // TODO: r.resp handling
     r.resp := AXI4Parameters.RESP_OKAY
-    r.last := Mux(already_burst_len === (ar.len + 1.U), resp.isReadLast, 0.U)
+    r.last := Mux(already_burst_len === (ar_reg.len + 1.U), resp.isReadLast, 0.U)
     resp.user.foreach(r.user := _)
 
     when (axi.r.fire && resp.isReadLast && r.last) {
@@ -154,7 +156,7 @@ class AXI42SimpleBusConverter() extends Module {
     req.size := aw_reg.size
     req.wmask := w.strb
     req.wdata := w.data
-    req.user.foreach(_ := aw.user)
+    req.user.foreach(_ := aw_reg.user)
     write_beat := write_beat + 1.U
 
     when (w.last) {
