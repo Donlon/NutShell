@@ -36,7 +36,7 @@ class AXI42SimpleBusConverter() extends Module {
   // Default value
 
   val inflight_id_reg = RegInit(0.U)
-  val axi_na :: axi_read :: axi_write :: Nil = Enum(3)
+  val axi_na :: axi_read :: axi_write :: axi_read_noall :: axi_write_noall :: Nil = Enum(5)
   val inflight_type = RegInit(axi_na)
   private def setState(axi_type: UInt, id: UInt) = {
     inflight_id_reg := id
@@ -52,7 +52,25 @@ class AXI42SimpleBusConverter() extends Module {
   private def isInflight() = {
     !isState(axi_na)
   }
+  private def isReadNoBurstAll() = {
+    isState(axi_read_noall)      //not burst all
+  }
 
+  private def isWriteNoBurstAll() = {
+    isState(axi_write_noall)      //not burst all
+  }
+
+  private def resetNoBurstAll() = {
+    inflight_type := axi_read_noall
+  }
+
+  private def OneTransferSize(len: UInt): UInt = {
+    Mux(len === 0.U, 1.U, 8.U)
+  }
+
+  private def isSimpleBurstAlign(len: UInt): Bool = {     //len : 8 对齐
+    ((len >> 3) << 3) === len
+  }
   // Default
   val default_mem = 0.U.asTypeOf(new SimpleBusUC)
   val default_axi = 0.U.asTypeOf(new AXI4)
@@ -60,7 +78,10 @@ class AXI42SimpleBusConverter() extends Module {
   r := default_axi.r.bits
   b := default_axi.b.bits
 
-  // Read Path
+  //将超过8的BURST len拆分为若干个burst len为8的section
+  val already_burst_len = RegInit(0.U(8.W))
+
+  // Read Path:第一种：完全重新接收一个命令    第二种：一个8len burst没做完
   when (!isInflight() && axi.ar.valid) {
     mem.req.valid := true.B
     req.addr := ar.addr
@@ -73,6 +94,23 @@ class AXI42SimpleBusConverter() extends Module {
 
     when (mem.req.fire) {
       setState(axi_read, ar.id)
+      already_burst_len := already_burst_len + OneTransferSize(ar.len)
+    }
+  }
+
+  when (isReadNoBurstAll()) {
+    mem.req.valid := true.B
+    req.addr := ar.addr + (already_burst_len << 3)
+    req.cmd := SimpleBusCmd.readBurst
+    // TODO: consider ar.burst
+    req.size := ar.size
+    req.user.foreach(_ := ar.user)
+    req.wmask := 0.U
+    req.wdata := 0.U
+
+    when (mem.req.fire) {
+      setState(axi_read, ar.id)
+      already_burst_len := already_burst_len + OneTransferSize(ar.len)
     }
   }
 
@@ -82,17 +120,23 @@ class AXI42SimpleBusConverter() extends Module {
     r.id := inflight_id_reg
     // TODO: r.resp handling
     r.resp := AXI4Parameters.RESP_OKAY
-    r.last := resp.isReadLast
+    r.last := Mux(already_burst_len === (ar.len + 1.U), resp.isReadLast, 0.U)
     resp.user.foreach(r.user := _)
 
-    when (axi.r.fire && resp.isReadLast) {
+    when (axi.r.fire && resp.isReadLast && r.last) {
       resetState()
+      already_burst_len := 0.U
+    }
+    when (axi.r.fire && resp.isReadLast && ~r.last) {
+      resetNoBurstAll()
     }
   }
 
   // Write Path
   val aw_reg = Reg(new AXI4BundleA(idBits))
   val bresp_en = RegInit(false.B)
+
+  val write_beat = RegInit(0.U(3.W))
 
   when (!isInflight() && axi.aw.valid && !axi.ar.valid) {
     aw_reg := aw
@@ -105,39 +149,58 @@ class AXI42SimpleBusConverter() extends Module {
   when (isState(axi_write) && axi.w.fire()) {
     mem.req.valid := true.B
     req.cmd := Mux(aw_reg.len === 0.U, SimpleBusCmd.write,
-      Mux(w.last, SimpleBusCmd.writeLast, SimpleBusCmd.writeBurst))
-    req.addr := aw_reg.addr
+      Mux(write_beat === 7.U, SimpleBusCmd.writeLast, SimpleBusCmd.writeBurst))
+    req.addr := aw_reg.addr + (already_burst_len << 3)
     req.size := aw_reg.size
     req.wmask := w.strb
     req.wdata := w.data
     req.user.foreach(_ := aw.user)
+    write_beat := write_beat + 1.U
 
     when (w.last) {
       bresp_en := true.B
+    }
+    when (req.cmd === SimpleBusCmd.writeLast) {
+      already_burst_len := already_burst_len + OneTransferSize(aw_reg.len)
+      when (~w.last) {
+        inflight_id_reg := axi_write_noall
+      }
     }
   }
 
   when (axi.b.fire) {
     bresp_en := false.B
     resetState()
+    write_beat := 0.U
+    already_burst_len := 0.U
   }
+
+  when (isWriteNoBurstAll()) {
+    write_beat := 0.U
+    when (mem.resp.fire()) {
+      inflight_id_reg := axi_write
+    }
+  }
+
+
 
   // Arbitration
   // Slave's ready maybe generated according to valid signal, so let valid signals go through.
-  mem.req.valid := (!isInflight() && axi.ar.valid) || (isState(axi_write) && axi.w.valid)
-  mem.resp.ready := !isInflight() || (isState(axi_read) && axi.r.ready) || (isState(axi_write) && axi.b.ready)
+  mem.req.valid := (!isInflight() && axi.ar.valid) || (isState(axi_write) && axi.w.valid) || isState(axi_read_noall)
+  //?
+  mem.resp.ready := !isInflight() || isReadNoBurstAll() || (isState(axi_read) && axi.r.ready) || (isState(axi_write) && axi.b.ready) || isWriteNoBurstAll()
   axi.ar.ready := !isInflight() && mem.req.ready
-  axi.r.valid := isState(axi_read) && mem.resp.valid
+  axi.r.valid := isState(axi_read) && mem.resp.valid && isState(axi_read)
   // AW should be buffered so no ready is considered.
   axi.aw.ready := !isInflight() && !axi.ar.valid
   axi.w.ready  := isState(axi_write) && mem.req.ready
   axi.b.valid := bresp_en && mem.resp.valid
   axi.b.bits.resp := AXI4Parameters.RESP_OKAY
 
-  when (axi.ar.fire()) { assert(mem.req.fire() && !isInflight()); }
+  when (axi.ar.fire()) { assert(mem.req.fire() && (!isInflight() || isReadNoBurstAll())); }
   when (axi.aw.fire()) { assert(!isInflight()); }
   when (axi.w.fire()) { assert(mem.req .fire() && isState(axi_write)); }
-  when (axi.b.fire()) { assert(mem.resp.fire() && isState(axi_write)); }
+  when (axi.b.fire()) { assert(mem.resp.fire() && (isState(axi_write) || isWriteNoBurstAll())); }
   when (axi.r.fire()) { assert(mem.resp.fire() && isState(axi_read)); }
 }
 

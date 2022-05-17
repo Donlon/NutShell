@@ -310,6 +310,7 @@ sealed class CacheStage3(implicit val cacheConfig: CacheConfig) extends CacheMod
   val dataWay = RegEnable(io.dataReadBus.resp.data, state2 === s2_dataReadWait)
   val dataHitWay = Mux1H(io.in.bits.waymask, dataWay).data
 
+  //读victim data cache line
   switch (state2) {
     is (s2_idle) { when (io.dataReadBus.req.fire()) { state2 := s2_dataReadWait } }
     is (s2_dataReadWait) { state2 := s2_dataOK }
@@ -438,13 +439,40 @@ sealed class CacheStage3(implicit val cacheConfig: CacheConfig) extends CacheMod
       io.out.bits.cmd := req.cmd
     }
   } else {
-    io.out.bits.rdata := Mux(hit, dataRead, inRdataRegDemand)
-    io.out.bits.cmd := Mux(io.in.bits.req.isRead(), SimpleBusCmd.readLast, Mux(io.in.bits.req.isWrite(), SimpleBusCmd.writeResp, DontCare))//DontCare, added by lemover
+    //io.out.bits.rdata := Mux(hit, dataRead, inRdataRegDemand)
+    //io.out.bits.cmd := Mux(io.in.bits.req.isRead(), SimpleBusCmd.readLast, Mux(io.in.bits.req.isWrite(), SimpleBusCmd.writeResp, DontCare))//DontCare, added by lemover
+    //I modify
+    when (~req.isBurst()) {
+      io.out.bits.rdata := Mux(hit, dataRead, inRdataRegDemand)
+      io.out.bits.cmd := Mux(io.in.bits.req.isRead(), SimpleBusCmd.readLast, Mux(io.in.bits.req.isWrite(), SimpleBusCmd.writeResp, DontCare))//DontCare, added by lemover
+    }.otherwise {
+      when ((state === s_memReadResp) && io.mem.resp.fire() && req.isReadBurst()) {
+        // readBurst request miss
+        io.out.bits.rdata := dataRefill
+        io.out.bits.cmd := Mux(io.mem.resp.bits.isReadLast(), SimpleBusCmd.readLast, SimpleBusCmd.readBurst)
+      }.elsewhen (req.isWriteLast() || req.cmd === SimpleBusCmd.writeBurst) {
+        // writeBurst/writeLast request, no matter hit or miss
+        io.out.bits.rdata := Mux(hit, dataRead, inRdataRegDemand)
+        io.out.bits.cmd := DontCare
+      }.elsewhen (hitReadBurst && state === s_release) {
+        // readBurst request hit
+        io.out.bits.rdata := dataHitWay
+        io.out.bits.cmd := Mux(respToL1Last, SimpleBusCmd.readLast, SimpleBusCmd.readBurst)
+      }.otherwise {
+        io.out.bits.rdata := Mux(hit, dataRead, inRdataRegDemand)
+        io.out.bits.cmd := req.cmd
+      }      
+    }
   }
   io.out.bits.user.zip(req.user).map { case (o,i) => o := i }
   io.out.bits.id.zip(req.id).map { case (o,i) => o := i }
 
-  io.out.valid := io.in.valid && Mux(req.isBurst() && (cacheLevel == 2).B,
+  /*io.out.valid := io.in.valid && Mux(req.isBurst() && (cacheLevel == 2).B,
+    Mux(req.isWrite() && (hit || !hit && state === s_wait_resp), true.B, (state === s_memReadResp && io.mem.resp.fire() && req.cmd === SimpleBusCmd.readBurst)) || (respToL1Fire && respToL1Last && state === s_release),
+    Mux(probe, false.B, Mux(hit, true.B, Mux(req.isWrite() || mmio, state === s_wait_resp, afterFirstRead && !alreadyOutFire)))
+  )*/
+  //I modify
+  io.out.valid := io.in.valid && Mux(req.isBurst() && (cacheLevel == 2 || cacheName == "dcache").B,
     Mux(req.isWrite() && (hit || !hit && state === s_wait_resp), true.B, (state === s_memReadResp && io.mem.resp.fire() && req.cmd === SimpleBusCmd.readBurst)) || (respToL1Fire && respToL1Last && state === s_release),
     Mux(probe, false.B, Mux(hit, true.B, Mux(req.isWrite() || mmio, state === s_wait_resp, afterFirstRead && !alreadyOutFire)))
   )
