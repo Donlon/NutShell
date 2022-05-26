@@ -3,7 +3,7 @@
 * Copyright (c) 2020 University of Chinese Academy of Sciences
 * 
 * NutShell is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2. 
+* You can use this software according to the terms and conditions of the Mulan PSL v2.
 * You may obtain a copy of Mulan PSL v2 at:
 *             http://license.coscl.org.cn/MulanPSL2 
 * 
@@ -29,5 +29,16 @@ object PipelineConnect {
     left.ready := right.ready
     right.bits := RegEnable(left.bits, left.valid && right.ready)
     right.valid := valid //&& !isFlush
+  }
+}
+
+object RetimingPipelineConnect {
+  def apply[T <: Data](left: DecoupledIO[T], right: DecoupledIO[T]) = {
+    right.valid := RegEnable(init = false.B,
+                             enable = left.valid && left.ready,
+                             next = left.valid)
+    right.bits := RegEnable(enable = (right.valid && right.ready) || (left.valid && !right.valid),
+                            next = left.bits)
+    left.ready := right.ready || !right.valid
   }
 }
