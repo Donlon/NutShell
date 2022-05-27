@@ -263,8 +263,11 @@ class SimpleBus2AXI4Converter[OT <: AXI4Lite](outType: OT, isFromCache: Boolean)
 }
 
 object SimpleBus2AXI4Converter {
-  def apply[OT <: AXI4Lite](in: SimpleBusUC, outType: OT, isFromCache: Boolean = false): OT = {
+  def apply[OT <: AXI4Lite](in: SimpleBusUC, outType: OT, isFromCache: Boolean = false, suggestedName: String = ""): OT = {
     val bridge = Module(new SimpleBus2AXI4Converter(outType, isFromCache))
+    if (suggestedName.nonEmpty) {
+      bridge.suggestName(suggestedName)
+    }
     bridge.io.in <> in
     bridge.io.out
   }

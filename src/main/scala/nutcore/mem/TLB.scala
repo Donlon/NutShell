@@ -614,6 +614,7 @@ sealed class TLBEmpty(implicit val tlbConfig: TLBConfig) extends TlbModule {
 object TLB {
   def apply(in: SimpleBusUC, mem: SimpleBusUC, flush: Bool, csrMMU: MMUIO)(implicit tlbConfig: TLBConfig) = {
     val tlb = Module(new TLB)
+    tlb.suggestName(tlbConfig.name)
     tlb.io.in <> in
     tlb.io.mem <> mem
     tlb.io.flush := flush

@@ -423,6 +423,7 @@ object EmbeddedTLB {
     } else {
       Module(new EmbeddedTLB_fake)
     }
+    tlb.suggestName(tlbConfig.name)
     tlb.io.in <> in
     tlb.io.mem <> mem
     tlb.io.flush := flush

@@ -144,7 +144,9 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
     PipelineVector2Connect(new DecodeIO, frontend.io.out(0), frontend.io.out(1), backend.io.in(0), backend.io.in(1), frontend.io.flushVec(1), 4)
 
     val mmioXbar = Module(new SimpleBusCrossbarNto1(2))
+    mmioXbar.suggestName("mmioXbar")
     val dmemXbar = Module(new SimpleBusCrossbarNto1(4))
+    dmemXbar.suggestName("dmemXbar")
 
     val itlb = EmbeddedTLB(in = frontend.io.imem, mem = dmemXbar.io.in(1), flush = frontend.io.flushVec(0) | frontend.io.bpFlush, csrMMU = backend.io.memMMU.imem, enable = HasITLB)(TLBConfig(name = "itlb", userBits = ICacheUserBundleWidth, totalEntry = 4))
     frontend.io.ipf := itlb.io.ipf

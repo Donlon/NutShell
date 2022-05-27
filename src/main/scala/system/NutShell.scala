@@ -110,18 +110,18 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
   mmioXbar.io.in <> nutcore.io.mmio
 
   val extDev = mmioXbar.io.out(2)
-  if (p.FPGAPlatform) { io.mmio <> extDev.toAXI4Lite() }
+  if (p.FPGAPlatform) { io.mmio <> extDev.toAXI4Lite("mmio_extdev_axi4lite_bridge") }
   else { io.mmio <> extDev }
 
   val clint = Module(new AXI4CLINT(sim = !p.FPGAPlatform))
-  clint.io.in <> mmioXbar.io.out(0).toAXI4Lite()
+  clint.io.in <> mmioXbar.io.out(0).toAXI4Lite("clint_axi4lite_bridge")
   val mtipSync = clint.io.extra.get.mtip
   val msipSync = clint.io.extra.get.msip
   BoringUtils.addSource(mtipSync, "mtip")
   BoringUtils.addSource(msipSync, "msip")
 
   val plic = Module(new AXI4PLIC(nrIntr = Settings.getInt("NrExtIntr"), nrHart = 1))
-  plic.io.in <> mmioXbar.io.out(1).toAXI4Lite()
+  plic.io.in <> mmioXbar.io.out(1).toAXI4Lite("plic_axi4lite_bridge")
   plic.io.extra.get.intrVec := RegNext(RegNext(io.meip))
   val meipSync = plic.io.extra.get.meip(0)
   BoringUtils.addSource(meipSync, "meip")
