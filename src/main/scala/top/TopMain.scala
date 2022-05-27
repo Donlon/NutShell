@@ -18,27 +18,13 @@ package top
 
 import nutcore.NutCoreConfig
 import system.NutShell
-import device.{AXI4VGA}
 import sim.SimTop
-
-import chisel3._
 import chisel3.stage._
-
-class Top extends Module {
-  val io = IO(new Bundle{})
-  val nutshell = Module(new NutShell()(NutCoreConfig()))
-  val vga = Module(new AXI4VGA)
-
-  nutshell.io := DontCare
-  vga.io := DontCare
-  dontTouch(nutshell.io)
-  dontTouch(vga.io)
-}
 
 object TopMain extends App {
   def parseArgs(info: String, args: Array[String]): String = {
     var target = ""
-    for (arg <- args) { if (arg.startsWith(info + "=") == true) { target = arg } }
+    for (arg <- args) { if (arg.startsWith(info + "=")) { target = arg } }
     require(target != "")
     target.substring(info.length()+1)
   }
@@ -69,7 +55,7 @@ object TopMain extends App {
     )
   } else {
     (new ChiselStage).execute(args, Seq(
-      ChiselGeneratorAnnotation(() => new Top))
-    )
+      ChiselGeneratorAnnotation(() => new NutShell()(NutCoreConfig()))
+    ))
   }
 }
