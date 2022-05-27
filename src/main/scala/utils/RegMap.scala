@@ -43,7 +43,7 @@ object MaskedRegMap {
   def UnwritableMask = 0.U(if (Settings.get("IsRV32")) 32.W else 64.W)
   def apply(addr: Int, reg: UInt, wmask: UInt = WritableMask, wfn: UInt => UInt = (x => x), rmask: UInt = WritableMask) = (addr, (reg, wmask, wfn, rmask))
   def generate(mapping: Map[Int, (UInt, UInt, UInt => UInt, UInt)], raddr: UInt, rdata: UInt,
-    waddr: UInt, wen: Bool, wdata: UInt, isIllegalRAddr: Bool, isIllegalWAddr: Bool = null):Unit = {
+    waddr: UInt, wen: Bool, wdata: UInt, isIllegalRAddr: Bool, isIllegalWAddr: Bool):Unit = {
     // TODO: check duplicated address
     val regReadSel = mapping.map { case (a, (_, _, _, _)) => a -> (raddr === a.U) }
     rdata := LookupTree(raddr, mapping.toList.map { case (a, (r, _, _, rm)) => (a.U, r & rm) })
@@ -64,5 +64,7 @@ object MaskedRegMap {
     }
   }
   def generate(mapping: Map[Int, (UInt, UInt, UInt => UInt, UInt)], addr: UInt, rdata: UInt,
-    wen: Bool, wdata: UInt, isIllegalAddr: Bool = null):Unit = generate(mapping, addr, rdata, addr, wen, wdata, isIllegalAddr, null)
+               wen: Bool, wdata: UInt, isIllegalAddr: Bool = null): Unit = generate(mapping, addr, rdata, addr, wen, wdata, isIllegalAddr, null)
+  def generate(mapping: Map[Int, (UInt, UInt, UInt => UInt, UInt)], raddr: UInt, rdata: UInt,
+               waddr: UInt, wen: Bool, wdata: UInt): Unit = generate(mapping, raddr, rdata, waddr, wen, wdata, null, null)
 }
