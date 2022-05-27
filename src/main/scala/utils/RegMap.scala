@@ -43,19 +43,26 @@ object MaskedRegMap {
   def UnwritableMask = 0.U(if (Settings.get("IsRV32")) 32.W else 64.W)
   def apply(addr: Int, reg: UInt, wmask: UInt = WritableMask, wfn: UInt => UInt = (x => x), rmask: UInt = WritableMask) = (addr, (reg, wmask, wfn, rmask))
   def generate(mapping: Map[Int, (UInt, UInt, UInt => UInt, UInt)], raddr: UInt, rdata: UInt,
-    waddr: UInt, wen: Bool, wdata: UInt):Unit = {
-    val chiselMapping = mapping.map { case (a, (r, wm, w, rm)) => (a.U, r, wm, w, rm) }
-    rdata := LookupTree(raddr, chiselMapping.map { case (a, r, wm, w, rm) => (a, r & rm) })
-    chiselMapping.map { case (a, r, wm, w, rm) =>
-      if (w != null && wm != UnwritableMask) when (wen && waddr === a) { r := w(MaskData(r, wdata, wm)) }
+    waddr: UInt, wen: Bool, wdata: UInt, isIllegalRAddr: Bool, isIllegalWAddr: Bool = null):Unit = {
+    // TODO: check duplicated address
+    val regReadSel = mapping.map { case (a, (_, _, _, _)) => a -> (raddr === a.U) }
+    rdata := LookupTree(raddr, mapping.toList.map { case (a, (r, _, _, rm)) => (a.U, r & rm) })
+    if (isIllegalRAddr != null) {
+      isIllegalRAddr := !regReadSel.values.reduce(_ || _)
+    }
+
+    val regWriteSel = if (raddr == waddr) regReadSel else mapping.map { case (a, (_, _, _, _)) => a -> (waddr === a.U) }
+    mapping.foreach { case (a, (r, wm, w, _)) =>
+      if (w != null && wm != UnwritableMask) {
+        when(wen && regWriteSel.getOrElse(a, false.B)) {
+          r := w(MaskData(r, wdata, wm))
+        }
+      }
+    }
+    if (isIllegalWAddr != null) {
+      isIllegalWAddr := !regWriteSel.values.reduce(_ || _)
     }
   }
-  def isIllegalAddr(mapping: Map[Int, (UInt, UInt, UInt => UInt, UInt)], addr: UInt):Bool = {
-    val illegalAddr = Wire(Bool())
-    val chiselMapping = mapping.map { case (a, (r, wm, w, rm)) => (a.U, r, wm, w, rm) }
-    illegalAddr := LookupTreeDefault(addr, true.B, chiselMapping.map { case (a, r, wm, w, rm) => (a, false.B) })
-    illegalAddr
-  }
   def generate(mapping: Map[Int, (UInt, UInt, UInt => UInt, UInt)], addr: UInt, rdata: UInt,
-    wen: Bool, wdata: UInt):Unit = generate(mapping, addr, rdata, addr, wen, wdata)
+    wen: Bool, wdata: UInt, isIllegalAddr: Bool = null):Unit = generate(mapping, addr, rdata, addr, wen, wdata, isIllegalAddr, null)
 }

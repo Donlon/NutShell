@@ -185,7 +185,7 @@ sealed class CacheStage2(implicit val cacheConfig: CacheConfig) extends CacheMod
   val pickForwardMeta = isForwardMetaReg || isForwardMeta
   val forwardMeta = Mux(isForwardMeta, io.metaWriteBus.req.bits, forwardMetaReg)
   val forwardWaymask = forwardMeta.waymask.getOrElse("1".U).asBools
-  forwardWaymask.zipWithIndex.map { case (w, i) =>
+  forwardWaymask.zipWithIndex.foreach { case (w, i) =>
     metaWay(i) := Mux(pickForwardMeta && w, forwardMeta.data, io.metaReadResp(i))
   }
 
@@ -403,7 +403,7 @@ sealed class CacheStage3(implicit val cacheConfig: CacheConfig) extends CacheMod
   }
 
   val dataRefill = MaskData(io.mem.resp.bits.rdata, req.wdata, Mux(readingFirst, wordMask, 0.U(DataBits.W)))
-  val dataRefillWriteBus = Wire(CacheDataArrayWriteBus).apply(
+  val dataRefillWriteBus = Wire(CacheDataArrayWriteBus()).apply(
     valid = (state === s_memReadResp) && io.mem.resp.fire(), setIdx = Cat(addr.index, readBeatCnt.value),
     data = Wire(new DataBundle).apply(dataRefill), waymask = io.in.bits.waymask)
 
