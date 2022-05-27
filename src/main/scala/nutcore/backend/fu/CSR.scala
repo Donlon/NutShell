@@ -365,7 +365,11 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
   }
 
   // Hart Priviledge Mode
-  val priviledgeMode = RegInit(UInt(2.W), ModeM)
+  val priviledgeMode = if (MModeOnly) {
+    ModeM
+  } else {
+    RegInit(UInt(2.W), ModeM)
+  }
 
   // perfcnt
   val hasPerfCnt = EnablePerfCnt && !p.FPGAPlatform
@@ -666,7 +670,9 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
     val mstatusNew = WireInit(mstatus.asTypeOf(new MstatusStruct))
     // mstatusNew.mpp.m := ModeU //TODO: add mode U
     mstatusNew.ie.m := mstatusOld.pie.m
-    priviledgeMode := mstatusOld.mpp
+    if (!MModeOnly) {
+      priviledgeMode := mstatusOld.mpp
+    }
     mstatusNew.pie.m := true.B
     mstatusNew.mpp := ModeU
     mstatus := mstatusNew.asUInt
@@ -679,7 +685,9 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
     val mstatusNew = WireInit(mstatus.asTypeOf(new MstatusStruct))
     // mstatusNew.mpp.m := ModeU //TODO: add mode U
     mstatusNew.ie.s := mstatusOld.pie.s
-    priviledgeMode := Cat(0.U(1.W), mstatusOld.spp)
+    if (!MModeOnly) {
+      priviledgeMode := Cat(0.U(1.W), mstatusOld.spp)
+    }
     mstatusNew.pie.s := true.B
     mstatusNew.spp := ModeU
     mstatus := mstatusNew.asUInt
@@ -692,7 +700,9 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
     val mstatusNew = WireInit(mstatus.asTypeOf(new MstatusStruct))
     // mstatusNew.mpp.m := ModeU //TODO: add mode U
     mstatusNew.ie.u := mstatusOld.pie.u
-    priviledgeMode := ModeU
+    if (!MModeOnly) {
+      priviledgeMode := ModeU
+    }
     mstatusNew.pie.u := true.B
     mstatus := mstatusNew.asUInt
     retTarget := uepc(VAddrBits-1, 0)
@@ -708,7 +718,9 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
       mstatusNew.spp := priviledgeMode
       mstatusNew.pie.s := mstatusOld.ie.s
       mstatusNew.ie.s := false.B
-      priviledgeMode := ModeS
+      if (!MModeOnly) {
+        priviledgeMode := ModeS
+      }
       when(tvalWen){stval := 0.U} // TODO: should not use =/=
       // printf("[*] mstatusNew.spp %x\n", mstatusNew.spp)
       // trapTarget := stvec(VAddrBits-1. 0)
@@ -718,7 +730,9 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
       mstatusNew.mpp := priviledgeMode
       mstatusNew.pie.m := mstatusOld.ie.m
       mstatusNew.ie.m := false.B
-      priviledgeMode := ModeM
+      if (!MModeOnly) {
+        priviledgeMode := ModeM
+      }
       when(tvalWen){mtval := 0.U} // TODO: should not use =/=
       // trapTarget := mtvec(VAddrBits-1. 0)
     }
