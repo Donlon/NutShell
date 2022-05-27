@@ -16,12 +16,9 @@
 
 package nutcore
 
-import chisel3._
 import chisel3.util._
 
-import top.Settings
-
-object Priviledged extends HasInstrType {
+object Priviledged extends HasInstrType with HasNutCoreParameter{
   def ECALL   = BitPat("b000000000000_00000_000_00000_1110011")
   def EBREAK  = BitPat("b000000000001_00000_000_00000_1110011")
   def MRET    = BitPat("b001100000010_00000_000_00000_1110011")
@@ -42,5 +39,5 @@ object Priviledged extends HasInstrType {
     FENCE          -> List(InstrS, FuType.mou, MOUOpType.fence), // nop    InstrS -> !wen
     WFI            -> List(InstrI, FuType.alu, ALUOpType.add) // nop
     // FENCE          -> List(InstrB, FuType.mou, MOUOpType.fencei)
-  ) ++ (if (!Settings.get("MmodeOnly")) table_s else Nil)
+  ) ++ (if (MModeOnly) table_s else Nil)
 }

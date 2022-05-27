@@ -78,7 +78,9 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
       l2cacheIn
     } else xbar.io.out
     val l2cacheInPipeline = Wire(new SimpleBusUC)
-    l2cacheIn.req <> l2cacheInPipeline.req
+//    l2cacheInPipeline <> l2cacheIn
+//    l2cacheInPipeline.req <> l2cacheIn.req
+    RetimingPipelineConnect(l2cacheIn.req, l2cacheInPipeline.req)
     RetimingPipelineConnect(l2cacheInPipeline.resp, l2cacheIn.resp)
     val l2Empty = Wire(Bool())
     l2cacheOut <> Cache(in = l2cacheInPipeline, mmio = 0.U.asTypeOf(new SimpleBusUC) :: Nil, flush = "b00".U, empty = l2Empty, enable = true)(
