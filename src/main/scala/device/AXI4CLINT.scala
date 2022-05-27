@@ -34,13 +34,14 @@ class AXI4CLINT(sim: Boolean = false) extends AXI4SlaveModule(new AXI4Lite, new 
   val msip = RegInit(0.U(64.W))
 
   val clk = (if (!sim) 40 /* 40MHz / 1000000 */ else 10000)
-  val freq = RegInit(clk.U(16.W))
+  val div = RegInit(clk.U(16.W))
   val inc = RegInit(1.U(16.W))
 
   val cnt = RegInit(0.U(16.W))
+  val tick = RegInit(false.B)
   val nextCnt = cnt + 1.U
-  cnt := Mux(nextCnt < freq, nextCnt, 0.U)
-  val tick = (nextCnt === freq)
+  cnt := Mux(tick, nextCnt, 0.U)
+  tick := nextCnt === div
   when (tick) { mtime := mtime + inc }
 
   if (sim) {
@@ -52,7 +53,7 @@ class AXI4CLINT(sim: Boolean = false) extends AXI4SlaveModule(new AXI4Lite, new 
   val mapping = Map(
     RegMap(0x0, msip),
     RegMap(0x4000, mtimecmp),
-    RegMap(0x8000, freq),
+    RegMap(0x8000, div),
     RegMap(0x8008, inc),
     RegMap(0xbff8, mtime)
   )
