@@ -58,9 +58,9 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
   xbar.io.in(0) <> cohMg.io.out.mem
   xbar.io.in(1) <> nutcore.io.dmem.mem
 
-  val axi2sb = Module(new AXI42SimpleBusConverter())
-  axi2sb.io.in <> io.frontend
-  nutcore.io.frontend <> axi2sb.io.out
+  val frontendAxi2SB = Module(new AXI42SimpleBusConverter())
+  frontendAxi2SB.io.in <> io.frontend
+  nutcore.io.frontend <> frontendAxi2SB.io.out.retiming(reqBackwardPath = true)
 
   val memport = xbar.io.out.toMemPort()
   memport.resp.bits.data := DontCare

@@ -57,7 +57,7 @@ object RetimingPipelineConnect {
         }.elsewhen(right.ready) {
           rvalid := false.B
         }
-        when(left.valid && left.ready) {
+        when(left.fire()) {
           rbits := left.bits
         }
 
@@ -67,7 +67,27 @@ object RetimingPipelineConnect {
 
       // Backward pipeline only, 100% throughput
       case ((false, true), true) =>
-        throw new UnsupportedOperationException("Backward pipeline only, 100% throughput is not supported");
+        val lready = RegInit(false.B)
+        val prefetchEnable = Wire(Bool())
+        val prefetchValid = RegNext(next = prefetchEnable, init = false.B)
+        val prefetchedBits = Reg(chiselTypeOf(left.bits))
+
+        lready := right.valid || !prefetchEnable
+
+        when (left.fire() && !right.ready) {
+          prefetchEnable := true.B
+        }.elsewhen(!left.fire() && right.ready && prefetchValid) {
+          prefetchEnable := false.B
+        }.otherwise {
+          prefetchEnable := prefetchValid;
+        }
+
+        when(left.fire()) {
+          prefetchedBits := left.bits
+        }
+        right.valid := left.valid || prefetchValid
+        right.bits := Mux(prefetchValid, prefetchedBits, left.bits)
+        left.ready := lready
 
       // Backward pipeline only, 50% throughput
       case ((false, true), false) =>
