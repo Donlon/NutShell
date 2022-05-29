@@ -1,17 +1,17 @@
 /**************************************************************************************
 * Copyright (c) 2020 Institute of Computing Technology, CAS
 * Copyright (c) 2020 University of Chinese Academy of Sciences
-* 
+*
 * NutShell is licensed under Mulan PSL v2.
 * You can use this software according to the terms and conditions of the Mulan PSL v2.
 * You may obtain a copy of Mulan PSL v2 at:
-*             http://license.coscl.org.cn/MulanPSL2 
-* 
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER 
-* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR 
-* FIT FOR A PARTICULAR PURPOSE.  
+*             http://license.coscl.org.cn/MulanPSL2
 *
-* See the Mulan PSL v2 for more details.  
+* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER
+* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR
+* FIT FOR A PARTICULAR PURPOSE.
+*
+* See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
 package utils
@@ -33,12 +33,55 @@ object PipelineConnect {
 }
 
 object RetimingPipelineConnect {
-  def apply[T <: Data](left: DecoupledIO[T], right: DecoupledIO[T]) = {
-    right.valid := RegEnable(init = false.B,
-                             enable = left.valid && left.ready,
-                             next = left.valid)
-    right.bits := RegEnable(enable = (right.valid && right.ready) || (left.valid && !right.valid),
-                            next = left.bits)
-    left.ready := right.ready || !right.valid
+  def apply[T <: Data](left: ReadyValidIO[T], right: ReadyValidIO[T],
+                       forwardPathPipeline: Boolean = true,
+                       backwardPathPipeline: Boolean = true,
+                       fullThroughput: Boolean = true
+                      ) = {
+    ((forwardPathPipeline, backwardPathPipeline), fullThroughput) match {
+      // Forward and backward pipeline, 100% throughput
+      case ((true, true), true) =>
+        throw new UnsupportedOperationException("Forward and backward pipeline, 100% throughput is not supported");
+
+      // Forward and backward pipeline, 50% throughput
+      case ((true, true), false) =>
+        throw new UnsupportedOperationException("Forward and backward pipeline, 50% throughput is not supported");
+
+      // Forward pipeline only, 100% throughput
+      case ((true, false), _) =>
+        val rvalid = RegInit(false.B)
+        val rbits = Reg(chiselTypeOf(left.bits))
+
+        when(left.valid) {
+          rvalid := true.B
+        }.elsewhen(right.ready) {
+          rvalid := false.B
+        }
+        when(left.valid && left.ready) {
+          rbits := left.bits
+        }
+
+        right.valid := rvalid
+        right.bits := rbits
+        left.ready := right.ready || !right.valid
+
+      // Backward pipeline only, 100% throughput
+      case ((false, true), true) =>
+        throw new UnsupportedOperationException("Backward pipeline only, 100% throughput is not supported");
+
+      // Backward pipeline only, 50% throughput
+      case ((false, true), false) =>
+        throw new UnsupportedOperationException("Backward pipeline only, 50% throughput is not supported");
+
+      // Pass-through
+      case ((false, false), _) =>
+        // left <> right;
+        right.valid := left.valid
+        right.bits := left.bits
+        left.ready := right.ready
+
+      case _ =>
+        throw new UnsupportedOperationException("pipeline type is not supported");
+    }
   }
 }

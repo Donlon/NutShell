@@ -1,9 +1,9 @@
 /**************************************************************************************
 * Copyright (c) 2020 Institute of Computing Technology, CAS
 * Copyright (c) 2020 University of Chinese Academy of Sciences
-* 
+*
 * NutShell is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2. 
+* You can use this software according to the terms and conditions of the Mulan PSL v2.
 * You may obtain a copy of Mulan PSL v2 at:
 *             http://license.coscl.org.cn/MulanPSL2 
 * 
@@ -11,7 +11,7 @@
 * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR 
 * FIT FOR A PARTICULAR PURPOSE.  
 *
-* See the Mulan PSL v2 for more details.  
+* See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
 package bus.simplebus
@@ -105,6 +105,23 @@ class SimpleBusUC(val userBits: Int = 0, val addrBits: Int = 32, val idBits: Int
   def toAXI4Lite(suggestedName: String = "") = SimpleBus2AXI4Converter(this, new AXI4Lite, false, suggestedName)
   def toAXI4(isFromCache: Boolean = false) = SimpleBus2AXI4Converter(this, new AXI4, isFromCache)
   def toMemPort() = SimpleBus2MemPortConverter(this, new MemPortIo(32))
+
+  def retiming(reqForwardPath: Boolean = false, reqBackwardPath: Boolean = false, reqFullThroughput: Boolean = true,
+               respForwardPath: Boolean = false, respBackwardPath: Boolean = false, respFullThroughput: Boolean = true): SimpleBusUC = {
+    val pipelinedBus = Wire(new SimpleBusUC)
+    // Connect request channel
+    RetimingPipelineConnect(this.req, pipelinedBus.req,
+      forwardPathPipeline = reqForwardPath,
+      backwardPathPipeline = reqBackwardPath,
+      fullThroughput = reqFullThroughput)
+    // Connect response channel
+    RetimingPipelineConnect(pipelinedBus.resp, this.resp,
+      forwardPathPipeline = respForwardPath,
+      backwardPathPipeline = respBackwardPath,
+      fullThroughput = respFullThroughput
+    )
+    pipelinedBus
+  }
 
   def dump(name: String) = {
     when (req.fire()) { printf(p"${GTimer()},[${name}] ${req.bits}\n") }
