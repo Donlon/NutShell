@@ -32,7 +32,7 @@ object TopMain extends App {
   val core = parseArgs("CORE", args)
   
   val s = (board match {
-    case "sim"    => Nil
+    case "sim"    => SimSettings()
     case "pynq"   => PynqSettings()
     case "axu3cg" => Axu3cgSettings()
     case "PXIe"   => PXIeSettings()

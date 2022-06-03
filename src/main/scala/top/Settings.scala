@@ -54,7 +54,8 @@ object PynqSettings {
     "MMIOSize" -> 0x0000000040000000L,
     "HasDTLB" -> false,
     "HasITLB" -> false,
-    "MmodeOnly" -> true
+    "MmodeOnly" -> true,
+    "VAddrBits" -> 32,
   )
 }
 
@@ -97,6 +98,15 @@ object EmbededSettings {
   )
 }
 
+object SimSettings {
+  def apply() = Map(
+    "VAddrBits" -> 34,
+    "HasDTLB" -> false,
+    "HasITLB" -> false,
+    "MmodeOnly" -> true,
+  )
+}
+
 object Settings {
   var settings: Map[String, AnyVal] = DefaultSettings()
   def get(field: String) = {
@@ -107,6 +117,9 @@ object Settings {
   }
   def getInt(field: String) = {
     settings(field).asInstanceOf[Int]
+  }
+  def getValue[V](field: String, default: V = null) = {
+    settings.getOrElse(field, default).asInstanceOf[V]
   }
 }
 

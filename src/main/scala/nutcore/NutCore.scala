@@ -36,7 +36,7 @@ trait HasNutCoreParameter {
   val HasITLB = Settings.get("HasITLB")
   val HasDTLB = Settings.get("HasDTLB")
   val AddrBits = 64 // AddrBits is used in some cases
-  val VAddrBits = if (Settings.get("IsRV32")) 32 else 39 // VAddrBits is Virtual Memory addr bits
+  val VAddrBits: Int = Settings.getValue("VAddrBits", if (Settings.get("IsRV32")) 32 else 39) // VAddrBits is Virtual Memory addr bits
   val PAddrBits = 32 // PAddrBits is Phyical Memory addr bits
   val AddrBytes = AddrBits / 8 // unused
   val DataBits = XLEN

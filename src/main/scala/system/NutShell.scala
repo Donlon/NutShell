@@ -112,7 +112,7 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
   else { io.mmio <> extDev }
 
   val clint = Module(new AXI4CLINT(sim = !p.FPGAPlatform))
-  clint.io.in <> mmioXbar.io.out(0).toAXI4Lite("clint_axi4lite_bridge")
+  clint.io.in <> mmioXbar.io.out(0).retiming(reqForwardPath = true).toAXI4Lite("clint_axi4lite_bridge")
   val mtipSync = clint.io.extra.get.mtip
   val msipSync = clint.io.extra.get.msip
   BoringUtils.addSource(mtipSync, "mtip")
