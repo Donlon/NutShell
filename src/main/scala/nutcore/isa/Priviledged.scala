@@ -39,5 +39,5 @@ object Priviledged extends HasInstrType with HasNutCoreParameter{
     FENCE          -> List(InstrS, FuType.mou, MOUOpType.fence), // nop    InstrS -> !wen
     WFI            -> List(InstrI, FuType.alu, ALUOpType.add) // nop
     // FENCE          -> List(InstrB, FuType.mou, MOUOpType.fencei)
-  ) ++ (if (MModeOnly) table_s else Nil)
+  ) ++ (if (!MModeOnly) table_s else Nil)
 }
