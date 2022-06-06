@@ -40,7 +40,10 @@ class AXI4CLINT(sim: Boolean = false) extends AXI4SlaveModule(new AXI4Lite, new 
   val cnt = RegInit(0.U(16.W))
   val tick = RegInit(false.B)
   val nextCnt = cnt + 1.U
-  cnt := Mux(tick, nextCnt, 0.U)
+  cnt := nextCnt
+  when (tick) {
+    cnt := 0.U
+  }
   tick := nextCnt === div
   when (tick) { mtime := mtime + inc }
 
