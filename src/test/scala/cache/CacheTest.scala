@@ -16,14 +16,17 @@
 
 package top
 
-import nutcore._
-import bus.simplebus._
-import device._
-import utils._
+class CacheTest {
+}
 
-import chisel3._
-import chisel3.util._
-import chisel3.util.experimental.BoringUtils
+// import nutcore._
+// import bus.simplebus._
+// import device._
+// import utils._
+//
+// import chisel3._
+// import chisel3.util._
+// import chisel3.util.experimental.BoringUtils
 
 // To run the following cache random test, do the following:
 // * uncomment the following class

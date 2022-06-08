@@ -1,4 +1,6 @@
-import mill._, scalalib._
+import mill._
+import scalalib._
+import mill.scalalib.TestModule.ScalaTest
 import coursier.maven.MavenRepository
 
 trait CommonModule extends ScalaModule {
@@ -33,9 +35,16 @@ trait HasChisel3 extends ScalaModule {
 }
 
 trait HasChiselTests extends CrossSbtModule  {
-  object test extends Tests {
-    override def ivyDeps = Agg(ivy"org.scalatest::scalatest:3.0.4", ivy"edu.berkeley.cs::chisel-iotesters:1.2+")
-    def testFrameworks = Seq("org.scalatest.tools.Framework")
+  object test extends Tests with ScalaTest {
+    override def ivyDeps = Agg(
+      ivy"org.scalatest::scalatest:3.2.12",
+      ivy"edu.berkeley.cs::chisel3:3.5.0",
+      ivy"edu.berkeley.cs::chiseltest:0.5.0",
+    )
+
+    override def scalacPluginIvyDeps = Agg(
+      ivy"edu.berkeley.cs:::chisel3-plugin:3.5.0",
+    )
   }
 }
 

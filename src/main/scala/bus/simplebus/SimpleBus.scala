@@ -108,7 +108,7 @@ class SimpleBusUC(val userBits: Int = 0, val addrBits: Int = 32, val idBits: Int
 
   def retiming(reqForwardPath: Boolean = false, reqBackwardPath: Boolean = false, reqFullThroughput: Boolean = true,
                respForwardPath: Boolean = false, respBackwardPath: Boolean = false, respFullThroughput: Boolean = true): SimpleBusUC = {
-    val pipelinedBus = Wire(new SimpleBusUC)
+    val pipelinedBus = Wire(new SimpleBusUC(userBits = userBits, addrBits = addrBits, idBits = idBits))
     // Connect request channel
     RetimingPipelineConnect(this.req, pipelinedBus.req,
       forwardPathPipeline = reqForwardPath,

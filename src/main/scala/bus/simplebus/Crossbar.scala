@@ -81,10 +81,10 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   }
 }
 
-class SimpleBusCrossbarNto1(n: Int, userBits:Int = 0) extends Module {
+class SimpleBusCrossbarNto1(n: Int, userBits:Int = 0, val addrBits: Int = 32) extends Module {
   val io = IO(new Bundle {
-    val in = Flipped(Vec(n, new SimpleBusUC(userBits)))
-    val out = new SimpleBusUC(userBits)
+    val in = Flipped(Vec(n, new SimpleBusUC(userBits, addrBits)))
+    val out = new SimpleBusUC(userBits, addrBits)
   })
 
   val s_idle :: s_readResp :: s_writeResp :: Nil = Enum(3)
