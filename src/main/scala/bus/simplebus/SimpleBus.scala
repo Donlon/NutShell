@@ -124,8 +124,8 @@ class SimpleBusUC(val userBits: Int = 0, val addrBits: Int = 32, val idBits: Int
   }
 
   def dump(name: String) = {
-    when (req.fire()) { printf(p"${GTimer()},[${name}] ${req.bits}\n") }
-    when (resp.fire()) { printf(p"${GTimer()},[${name}] ${resp.bits}\n") }
+    when (req.fire) { printf(p"${GTimer()},[${name}] ${req.bits}\n") }
+    when (resp.fire) { printf(p"${GTimer()},[${name}] ${resp.bits}\n") }
   }
 }
 

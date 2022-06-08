@@ -55,8 +55,8 @@ class AXI4DMA extends AXI4SlaveModule(new AXI4Lite, new DMABundle) with HasNutCo
   }
   val read_beat = RegInit(0.U(4.W))
   when (state === s_idle && len =/= 0.U) { state := s_read_req }
-  when (state === s_read_req && dma.ar.fire()) { state := s_read_wait_resp }
-  when (state === s_read_wait_resp && dma.r.fire()) {
+  when (state === s_read_req && dma.ar.fire) { state := s_read_wait_resp }
+  when (state === s_read_wait_resp && dma.r.fire) {
     read_beat := read_beat + 1.U
     data(read_beat) := dma.r.bits.data
     when (read_beat === 15.U) {
@@ -67,14 +67,14 @@ class AXI4DMA extends AXI4SlaveModule(new AXI4Lite, new DMABundle) with HasNutCo
 
   val wSend = Wire(Bool())
   val wlast = dma.w.bits.last
-  val awAck = BoolStopWatch(dma.aw.fire(), wSend)
-  val wAck = BoolStopWatch(dma.w.fire() && wlast, wSend)
-  wSend := (dma.aw.fire() && dma.w.fire() && wlast) || (awAck && wAck)
+  val awAck = BoolStopWatch(dma.aw.fire, wSend)
+  val wAck = BoolStopWatch(dma.w.fire && wlast, wSend)
+  wSend := (dma.aw.fire && dma.w.fire && wlast) || (awAck && wAck)
 
   val write_beat = RegInit(0.U(4.W))
 
   when (state === s_write_req && wSend) { state := s_write_wait_resp }
-  when (state === s_write_wait_resp && dma.b.fire()) {
+  when (state === s_write_wait_resp && dma.b.fire) {
     len := len - step.U
     dest := dest + step.U
     src := src + step.U
@@ -82,7 +82,7 @@ class AXI4DMA extends AXI4SlaveModule(new AXI4Lite, new DMABundle) with HasNutCo
     write_beat := 0.U
   }
 
-  when (state === s_write_req && dma.w.fire()) {
+  when (state === s_write_req && dma.w.fire) {
     write_beat := write_beat + 1.U
   }
 
@@ -115,7 +115,7 @@ class AXI4DMA extends AXI4SlaveModule(new AXI4Lite, new DMABundle) with HasNutCo
   )
 
   RegMap.generate(mapping, raddr(4,0), in.r.bits.data,
-    waddr(4,0), in.w.fire(), in.w.bits.data, MaskExpand(in.w.bits.strb >> waddr(2,0)))
+    waddr(4,0), in.w.fire, in.w.bits.data, MaskExpand(in.w.bits.strb >> waddr(2,0)))
 
   Debug(len =/= 0.U && state === s_idle, "dma len not 0!\n")
 }

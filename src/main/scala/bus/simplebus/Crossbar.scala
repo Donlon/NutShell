@@ -37,7 +37,7 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   val outSelVec = VecInit(PriorityEncoderOH(outMatchVec))
   val outSelRespVec = RegEnable(next=outSelVec,
                                 init=VecInit(Seq.fill(outSelVec.length)(false.B)),
-                                enable=io.in.req.fire() && state === s_idle)
+                                enable=io.in.req.fire && state === s_idle)
   val reqInvalidAddr = io.in.req.valid && !outSelVec.asUInt.orR
 
   when (reqInvalidAddr) {
@@ -49,11 +49,11 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
 
   switch (state) {
     is (s_idle) {
-      when (io.in.req.fire()) { state := s_resp }
+      when (io.in.req.fire) { state := s_resp }
       when (reqInvalidAddr) { state := s_error }
     }
-    is (s_resp) { when (io.in.resp.fire()) { state := s_idle } } // TODO: isReadLast
-    is (s_error) { when (io.in.resp.fire()) { state := s_idle } }
+    is (s_resp) { when (io.in.resp.fire) { state := s_idle } } // TODO: isReadLast
+    is (s_error) { when (io.in.resp.fire) { state := s_idle } }
   }
 
   // bind out.req channel
@@ -72,10 +72,10 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
   // io.in.resp.bits.exc.get := state === s_error
 
   Debug() {
-    when (io.in.req.fire()) {
+    when (io.in.req.fire) {
       printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.req: ${io.in.req.bits}\n")
     }
-    when (io.in.resp.fire()) {
+    when (io.in.resp.fire) {
       printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.resp: ${io.in.resp.bits}\n")
     }
   }
@@ -111,14 +111,14 @@ class SimpleBusCrossbarNto1(n: Int, userBits:Int = 0) extends Module {
 
   switch (state) {
     is (s_idle) {
-      when (thisReq.fire()) {
+      when (thisReq.fire) {
         inflightSrc := inputArb.io.chosen
         when (thisReq.bits.isRead()) { state := s_readResp }
         .elsewhen (thisReq.bits.isWriteLast() || thisReq.bits.isWriteSingle()) { state := s_writeResp }
       }
     }
-    is (s_readResp) { when (io.out.resp.fire() && io.out.resp.bits.isReadLast()) { state := s_idle } }
-    is (s_writeResp) { when (io.out.resp.fire()) { state := s_idle } }
+    is (s_readResp) { when (io.out.resp.fire && io.out.resp.bits.isReadLast()) { state := s_idle } }
+    is (s_writeResp) { when (io.out.resp.fire) { state := s_idle } }
   }
 }
 
@@ -174,10 +174,10 @@ class SimpleBusAutoIDCrossbarNto1(n: Int, userBits: Int = 0) extends Module {
   }
 
   Debug(){
-    when(io.out.req.fire()){
+    when(io.out.req.fire){
       printf("[Crossbar REQ] addr %x cmd %x select %b\n", io.out.req.bits.addr, io.out.req.bits.cmd, reqSelectVec)
     }
-    when(io.out.resp.fire()){
+    when(io.out.resp.fire){
       printf("[Crossbar RESP] data %x select %b\n", io.out.resp.bits.rdata, io.out.resp.bits.id.get)
     }
   }

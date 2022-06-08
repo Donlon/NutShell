@@ -57,7 +57,7 @@ object RetimingPipelineConnect {
         }.elsewhen(right.ready) {
           rvalid := false.B
         }
-        when(left.fire()) {
+        when(left.fire) {
           rbits := left.bits
         }
 
@@ -74,15 +74,15 @@ object RetimingPipelineConnect {
 
         lready := right.valid || !prefetchEnable
 
-        when (left.fire() && !right.ready) {
+        when (left.fire && !right.ready) {
           prefetchEnable := true.B
-        }.elsewhen(!left.fire() && right.ready && prefetchValid) {
+        }.elsewhen(!left.fire && right.ready && prefetchValid) {
           prefetchEnable := false.B
         }.otherwise {
           prefetchEnable := prefetchValid;
         }
 
-        when(left.fire()) {
+        when(left.fire) {
           prefetchedBits := left.bits
         }
         right.valid := left.valid || prefetchValid

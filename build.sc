@@ -23,9 +23,13 @@ trait HasChisel3 extends ScalaModule {
       MavenRepository("https://oss.sonatype.org/content/repositories/snapshots")
     )
   }
-   override def ivyDeps = Agg(
-    ivy"edu.berkeley.cs::chisel3:3.5.0-RC1"
- )
+  override def ivyDeps = Agg(
+    ivy"edu.berkeley.cs::chisel3:3.5.0",
+  )
+
+  override def scalacPluginIvyDeps = Agg(
+    ivy"edu.berkeley.cs:::chisel3-plugin:3.5.0",
+  )
 }
 
 trait HasChiselTests extends CrossSbtModule  {
