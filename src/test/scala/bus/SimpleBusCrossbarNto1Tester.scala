@@ -37,11 +37,11 @@ private object RequestType {
   def get(addr: UInt, width: Int) = addr(width - 1, width - 2)
 }
 
-class SimpleBusRequesterGen(addrBits: Int, userBits: Int) extends Module {
+class SimpleBusRequesterGen(seed: Int, addrBits: Int, userBits: Int) extends Module {
   val LineBeats = 8 //DATA WIDTH 64
-  val SEED = 0x514
 
   val req = IO(Decoupled(new SimpleBusReqBundle(userBits, addrBits)))
+  val reqThrottling = IO(Input(UInt(16.W)))
 
   // val isRequestDone = Wire(Bool())
   val burstWriteIndex = RegInit(0.U(3.W))
@@ -51,9 +51,13 @@ class SimpleBusRequesterGen(addrBits: Int, userBits: Int) extends Module {
   // val reqData = Reg(chiselTypeOf(req.bits.wdata))
   val reqCmd = Wire(SimpleBusCmd())
   val reqData = Wire(chiselTypeOf(req.bits.wdata))
-  val reqAddr = MyPRNG(addrBits, Some(SEED))
+  val reqAddr = MyPRNG(addrBits, Some(seed))
   val reqType = RequestType.get(reqAddr.current, addrBits)
   val nextReqType = RequestType.get(reqAddr.nextValue, addrBits)
+
+  val reqThrottlingRNG = MyPRNG(32, Some(seed))
+  val reqThrottlingCycles = ((reqThrottling * reqThrottlingRNG.current) >> 32).asUInt()(15, 0)
+  val reqThrottlingCounter = RegInit(0.U(16.W))
 
   val lastReqData = RegEnable(next = reqData, enable = req.fire)
 
@@ -76,8 +80,21 @@ class SimpleBusRequesterGen(addrBits: Int, userBits: Int) extends Module {
 
   // val isRequestDone = req.fire && reqCmd =/= SimpleBusCmd.writeBurst
   when(req.fire || !reqValid) { // TODO: insert idle cycles
-    reqValid := true.B
+    when(/*reqThrottlingCycles === 0.U &&*/ reqThrottlingCounter === 0.U) {
+      reqValid := true.B
+    }.otherwise {
+      reqValid := false.B
+    }
   }
+  when(!reqValid && reqThrottlingCounter =/= 0.U) {
+    reqThrottlingCounter := reqThrottlingCounter - 1.U
+  }
+  when(req.fire) {
+    // printf("fire\n")
+    reqThrottlingRNG.next()
+    reqThrottlingCounter := reqThrottlingCycles
+  }
+
   // TODO: use registered output for better readability
   switch(reqType) {
     is(RequestType.read) {
@@ -112,15 +129,15 @@ class SimpleBusRequesterGen(addrBits: Int, userBits: Int) extends Module {
   }
 }
 
-class SimpleBusRequesterMon(addrBits: Int, userBits: Int) extends Module {
+class SimpleBusRequesterMon(seed: Int, addrBits: Int, userBits: Int) extends Module {
   val LineBeats = 8 // DATA WIDTH 64
-  val SEED = 0x514
 
   val resp = IO(Flipped(Decoupled(new SimpleBusRespBundle(userBits))))
+  val respThrottling = IO(Input(UInt(16.W)))
 
   resp.ready := true.B
   val isResponseDone = Wire(Bool())
-  val expectedReadAddr = MyPRNG(addrBits, Some(SEED))
+  val expectedReadAddr = MyPRNG(addrBits, Some(seed))
   val expectedReqType = RequestType.get(expectedReadAddr.current, addrBits)
 
   val burstReadIndex = RegInit(0.U(3.W))
@@ -172,10 +189,19 @@ class SimpleBusRequesterMon(addrBits: Int, userBits: Int) extends Module {
   // TODO: monitor burst read response len
 }
 
-class SimpleBusRequester(addrBits: Int, userBits: Int) extends Module {
+class SimpleBusRequester(seed: Int, addrBits: Int, userBits: Int) extends Module {
   val outBus = IO(new SimpleBusUC(userBits, addrBits))
-  val gen = Module(new SimpleBusRequesterGen(addrBits, userBits))
-  val mon = Module(new SimpleBusRequesterMon(addrBits, userBits))
+  val reqCount = IO(Output(UInt()))
+  val respCount = IO(Output(UInt()))
+  val reqThrottling = IO(Input(UInt(16.W)))
+  val respThrottling = IO(Input(UInt(16.W)))
+
+  val gen = Module(new SimpleBusRequesterGen(seed, addrBits, userBits))
+  val mon = Module(new SimpleBusRequesterMon(seed, addrBits, userBits))
+  gen.reqThrottling := reqThrottling
+  mon.respThrottling := respThrottling
+  reqCount := Counter(gen.req.fire, 65536)._1
+  respCount := Counter(mon.resp.fire, 65536)._1
   outBus.req <> gen.req
   outBus.resp <> mon.resp
 }
@@ -292,26 +318,38 @@ class SimpleBusDirectlyConnectedTester(addrBits: Int, userBits: Int) extends Mod
   val io = IO(new Bundle {
     val reqCount = Output(UInt())
     val respCount = Output(UInt())
+    val reqThrottling = Input(UInt(16.W))
+    val respThrottling = Input(UInt(16.W))
   })
-  val requester = Module(new SimpleBusRequester(addrBits, userBits))
+  val SEED = 0x514
+  val requester = Module(new SimpleBusRequester(SEED, addrBits, userBits))
   val responser = Module(new SimpleBusResponser(addrBits, userBits))
   requester.outBus <> responser.io.in
+  requester.reqThrottling := io.reqThrottling
+  requester.respThrottling := io.respThrottling
 
-  io.reqCount := responser.io.reqCount
-  io.respCount := responser.io.respCount
+  io.reqCount := requester.reqCount
+  io.respCount := requester.respCount
 }
 
 class SimpleBusCrossbarNto1Tester(n: Int, addrBits: Int, userBits: Int) extends Module {
   val io = IO(new Bundle {
-    val reqCount = Output(UInt())
-    val respCount = Output(UInt())
+    val reqCount = Output(Vec(n, UInt()))
+    val respCount = Output(Vec(n, UInt()))
+    val reqThrottling = Input(UInt(16.W))
+    val respThrottling = Input(UInt(16.W))
   })
-  val requesters = List.fill(n)(Module(new SimpleBusRequester(addrBits, userBits)))
+  val SEED = 0x514
+  val requesters = List.fill(n)(Module(new SimpleBusRequester((SEED + n) * (n + 1), addrBits, userBits)))
   val responser = Module(new SimpleBusResponser(addrBits, userBits))
   val xbar = Module(new SimpleBusCrossbarNto1(n = n, userBits = userBits, addrBits = addrBits))
-  (requesters zip xbar.io.in).foreach { case (left, right) => left.outBus <> right }
+  (requesters zip xbar.io.in).foreach { case (left, right) =>
+    left.outBus <> right
+    left.reqThrottling := io.reqThrottling
+    left.respThrottling := io.respThrottling
+  }
   xbar.io.out <> responser.io.in
 
-  io.reqCount := responser.io.reqCount
-  io.respCount := responser.io.respCount
+  io.reqCount := requesters.map(r => r.reqCount)
+  io.respCount := requesters.map(r => r.respCount)
 }
