@@ -46,10 +46,30 @@ object SimpleBusCmd {
   def apply() = UInt(4.W)
 }
 
-class SimpleBusReqBundle(val userBits: Int = 0, val addrBits: Int = 32, val idBits: Int = 0) extends SimpleBusBundle {
+trait HasSimpleBusCmd {
+  val cmd = Output(SimpleBusCmd())
+
+  def isRead() = !cmd(0) && !cmd(3)
+  def isWrite() = cmd(0)
+  def isBurst() = cmd(1)
+  def isReadBurst() = cmd === SimpleBusCmd.readBurst
+  def isWriteSingle() = cmd === SimpleBusCmd.write
+  def isWriteLast() = cmd === SimpleBusCmd.writeLast
+  def isProbe() = cmd === SimpleBusCmd.probe
+  def isPrefetch() = cmd === SimpleBusCmd.prefetch
+
+  def isReadLast() = cmd === SimpleBusCmd.readLast
+  def isProbeHit() = cmd === SimpleBusCmd.probeHit
+  def isProbeMiss() = cmd === SimpleBusCmd.probeMiss
+  def isWriteResp() = cmd === SimpleBusCmd.writeResp
+}
+
+class SimpleBusReqBundle(val userBits: Int = 0, val addrBits: Int = 32, val idBits: Int = 0)
+  extends SimpleBusBundle with HasSimpleBusCmd {
+
   val addr = Output(UInt(addrBits.W))
   val size = Output(UInt(3.W))
-  val cmd = Output(SimpleBusCmd())
+  override val cmd = Output(SimpleBusCmd())
   val wmask = Output(UInt((DataBits / 8).W))
   val wdata = Output(UInt(DataBits.W))
   val user = if (userBits > 0) Some(Output(UInt(userBits.W))) else None
@@ -69,30 +89,16 @@ class SimpleBusReqBundle(val userBits: Int = 0, val addrBits: Int = 32, val idBi
     this.user.map(_ := user)
     this.id.map(_ := id)
   }
-
-  def isRead() = !cmd(0) && !cmd(3)
-  def isWrite() = cmd(0)
-  def isBurst() = cmd(1)
-  def isReadBurst() = cmd === SimpleBusCmd.readBurst
-  def isWriteSingle() = cmd === SimpleBusCmd.write
-  def isWriteLast() = cmd === SimpleBusCmd.writeLast
-  def isProbe() = cmd === SimpleBusCmd.probe
-  def isPrefetch() = cmd === SimpleBusCmd.prefetch
 }
 
-class SimpleBusRespBundle(val userBits: Int = 0, val idBits: Int = 0) extends SimpleBusBundle {
-  val cmd = Output(SimpleBusCmd())
+class SimpleBusRespBundle(val userBits: Int = 0, val idBits: Int = 0)
+  extends SimpleBusBundle with HasSimpleBusCmd {
+  override val cmd = Output(SimpleBusCmd())
   val rdata = Output(UInt(64.W))  // TODO: when frontend datapath support 32bit, set DataBits.W here
   val user = if (userBits > 0) Some(Output(UInt(userBits.W))) else None
   val id = if (idBits > 0) Some(Output(UInt(idBits.W))) else None
 
   override def toPrintable: Printable = p"rdata = ${Hexadecimal(rdata)}, cmd = ${cmd}"
-
-  def isReadLast() = cmd === SimpleBusCmd.readLast
-  def isProbeHit() = cmd === SimpleBusCmd.probeHit
-  def isProbeMiss() = cmd === SimpleBusCmd.probeMiss
-  def isWriteResp() = cmd === SimpleBusCmd.writeResp
-  def isPrefetch() = cmd === SimpleBusCmd.prefetch
 }
 
 // Uncache
