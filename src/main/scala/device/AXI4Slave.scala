@@ -63,7 +63,8 @@ abstract class AXI4SlaveModule[T <: AXI4Lite, B <: Data](_type :T = new AXI4, _e
       (beatCnt.value, axi4.r.bits.last)
 
     case axi4lite: AXI4Lite =>
-      raddr := axi4lite.ar.bits.addr
+      raddr := RegEnable(next = axi4lite.ar.bits.addr, enable = axi4lite.ar.fire)
+      // raddr := HoldUnless(axi4lite.ar.bits.addr, axi4lite.ar.fire)
       (0.U, true.B)
   }
 
@@ -86,7 +87,8 @@ abstract class AXI4SlaveModule[T <: AXI4Lite, B <: Data](_type :T = new AXI4, _e
       (c.value, axi4.w.bits.last)
 
     case axi4lite: AXI4Lite =>
-      waddr := axi4lite.aw.bits.addr
+      waddr := RegEnable(next = axi4lite.aw.bits.addr, enable = axi4lite.aw.fire)
+      // waddr := HoldUnless(axi4lite.aw.bits.addr, axi4lite.aw.fire)
       (0.U, true.B)
   }
 
