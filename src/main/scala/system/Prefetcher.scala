@@ -42,9 +42,6 @@ class Prefetcher extends Module with HasPrefetcherParameter {
   //lastReqAddr not be initted, in vivado simulation maybe fail
   //val lastReqAddr = (RegEnable(io.in.bits.addr, io.in.fire))
   val lastReqAddr = RegInit(0.U(AddrBits.W))
-  when (io.in.fire) {
-     lastReqAddr := io.in.bits.addr
-  }
   val thisReqAddr = io.in.bits.addr
   val lineMask = Cat(Fill(AddrBits - 6, 1.U(1.W)), 0.U(6.W))
   val neqAddr = (thisReqAddr & lineMask) =/= (lastReqAddr & lineMask)
@@ -53,14 +50,16 @@ class Prefetcher extends Module with HasPrefetcherParameter {
     io.out.bits <> io.in.bits
     io.out.valid := io.in.valid
     io.in.ready := !io.in.valid || io.out.fire
-    getNewReq := io.in.fire && io.in.bits.isBurst() && neqAddr
+    getNewReq := io.in.fire && io.in.bits.isReadBurst() && neqAddr
   }.otherwise {
     io.out.bits <> prefetchReq
     io.out.valid := !AddressSpace.isMMIO(prefetchReq.addr)
     io.in.ready := false.B
     getNewReq := !(io.out.fire || AddressSpace.isMMIO(prefetchReq.addr))
   }
-  
+  when (getNewReq) {
+    lastReqAddr := io.in.bits.addr
+  }
   Debug() {
     printf("%d: [Prefetcher]: in(%d,%d), out(%d,%d), in.bits.addr = %x\n",
       GTimer(), io.in.valid, io.in.ready, io.out.valid, io.out.ready, io.in.bits.addr)
