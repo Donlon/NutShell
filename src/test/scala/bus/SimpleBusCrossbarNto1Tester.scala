@@ -131,11 +131,20 @@ class SimpleBusRequesterMon(MonitorID: Int, seed: Int, addrBits: Int, userBits: 
   val resp = IO(Flipped(Decoupled(new SimpleBusRespBundle(userBits))))
   val respThrottling = IO(Input(UInt(16.W)))
 
+  val respReady = RegInit(false.B)
   val respThrottlingRNG = MyPRNG(32, Some(seed))
   val respThrottlingCycles = ((respThrottling * respThrottlingRNG.current) >> 32).asUInt()(15, 0)
   val respThrottlingCounter = RegInit(0.U(16.W))
 
-  resp.ready := true.B
+  resp.ready := respThrottlingCounter === 0.U
+
+  when(!respReady && respThrottlingCounter =/= 0.U) {
+    respThrottlingCounter := respThrottlingCounter - 1.U
+  }
+  when(resp.fire) {
+    respThrottlingRNG.next()
+    respThrottlingCounter := respThrottlingCycles
+  }
 
   val isResponseDone = Wire(Bool())
   val expectedReadAddr = MyPRNG(addrBits, Some(seed))
@@ -165,7 +174,7 @@ class SimpleBusRequesterMon(MonitorID: Int, seed: Int, addrBits: Int, userBits: 
       }
       is(RequestType.readBurst) {
         when(burstReadIndex =/= (LineBeats - 1).U) {
-          assert(resp.bits.cmd === SimpleBusCmd.read,
+          assert(resp.bits.cmd === SimpleBusCmd.readBurst,
             "Monitor %d: Unexpected resp.cmd %d, addr=0x%x",
             MonitorID.U, resp.bits.cmd, expectedReadAddr.current)
           burstReadIndex := burstReadIndex + 1.U
@@ -175,7 +184,7 @@ class SimpleBusRequesterMon(MonitorID: Int, seed: Int, addrBits: Int, userBits: 
           burstReadIndex := 0.U
         }
         when(burstReadIndex === 0.U) {
-          assert(resp.bits.rdata === getExpectedReadData(expectedReadAddr.current, addrBits),)
+          assert(resp.bits.rdata === getExpectedReadData(expectedReadAddr.current, addrBits))
         }.otherwise {
           assert(resp.bits.rdata === MyPRNG.nextRand(lastRespData, addrBits))
         }
@@ -227,7 +236,7 @@ class SimpleBusResponserCore(addrBits: Int, userBits: Int) extends Module {
   val lastWriteData = RegEnable(next = inBus.req.bits.wdata, enable = inBus.req.fire)
 
   // Request processing
-  inBus.req.ready := !(inBus.resp.valid && (!inBus.resp.ready || inBus.resp.bits.cmd === SimpleBusCmd.read))
+  inBus.req.ready := !(inBus.resp.valid && (!inBus.resp.ready || inBus.resp.bits.cmd === SimpleBusCmd.readBurst))
   // TODO: req.ready throttling
 
   // Response processing
@@ -243,7 +252,7 @@ class SimpleBusResponserCore(addrBits: Int, userBits: Int) extends Module {
     when(inBus.req.bits.isRead()) {
       respValid := true.B
       when(inBus.req.bits.isReadBurst()) {
-        respCmd := SimpleBusCmd.read
+        respCmd := SimpleBusCmd.readBurst
       }.otherwise {
         respCmd := SimpleBusCmd.readLast
       }
@@ -272,8 +281,15 @@ class SimpleBusResponserCore(addrBits: Int, userBits: Int) extends Module {
       respCmd := SimpleBusCmd.writeResp
       respData := 0.U
       assert(inBus.req.bits.wdata === MyPRNG.nextRand(lastWriteData, addrBits))
-      assert(burstWriteIndex === (LineBeats - 1).U)
+      // assert(burstWriteIndex === (LineBeats - 1).U)
       burstWriteIndex := 0.U
+    }
+    when (burstWriteIndex =/= 0.U) {
+      when (burstWriteIndex === (LineBeats - 1).U) {
+        assert(inBus.req.bits.cmd === SimpleBusCmd.writeLast)
+      }.otherwise{
+        assert(inBus.req.bits.cmd === SimpleBusCmd.writeBurst)
+      }
     }
   }
   when(inBus.resp.fire && inBus.resp.bits.isRead()) {

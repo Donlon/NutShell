@@ -83,7 +83,7 @@ class SimpleBusCrossbar1toN(addressSpace: List[List[(Long, Long)]]) extends Modu
 
 class SimpleBusCrossbarRRArbiter(n: Int) extends Module {
   val reqValid = IO(Input(Vec(n, Bool())))
-  val respReady = IO(Input(Bool()))
+  val reqReady = IO(Input(Bool()))
   val wantsLock = IO(Input(Bool()))
   val grantVec = IO(Output(Vec(n, Bool())))
   val hasRequest = IO(Output(Bool()))
@@ -97,7 +97,7 @@ class SimpleBusCrossbarRRArbiter(n: Int) extends Module {
     val preGrant_n = (~reqValidCat).asUInt | (reqValidCat - lastGrantRotated)
     grantVec := Mux(wantsLock, VecInit(lastGrant.asBools), VecInit(Seq.tabulate(n)(i => !(preGrant_n(i) && preGrant_n(n + i)))))
 
-    when(hasRequest && respReady && !wantsLock) {
+    when(hasRequest && reqReady && !wantsLock) {
       lastGrant := grantVec.asUInt
     }
 
@@ -119,8 +119,8 @@ class SimpleBusCrossbarNto1(n: Int,
   })
 
   val enqueueGrantVec = Wire(new IrrevocableIO(Vec(n, Bool())))
-  val dequeuedGrantVec = Queue(enq = enqueueGrantVec,
-    entries = maxOutstandingTransactions).suggestName("sourceInfoQueue")
+  val dequeuedGrantVec = Queue(enq = enqueueGrantVec, entries = maxOutstandingTransactions)
+    .suggestName("sourceInfoQueue")
 
   // Request channel processing
   val wantsLock = RegInit(false.B)
@@ -128,7 +128,7 @@ class SimpleBusCrossbarNto1(n: Int,
 
   val reqArbiter = Module(new SimpleBusCrossbarRRArbiter(n))
   reqArbiter.reqValid := io.in.map(_.req.valid)
-  reqArbiter.respReady := io.out.resp.ready && enqueueGrantVec.ready
+  reqArbiter.reqReady := io.out.req.ready && enqueueGrantVec.ready
   reqArbiter.wantsLock := wantsLock
   grantVec := reqArbiter.grantVec
 
@@ -144,15 +144,20 @@ class SimpleBusCrossbarNto1(n: Int,
   when (io.out.req.fire && enqueueGrantVec.ready) {
     wantsLock := io.out.req.bits.cmd === SimpleBusCmd.writeBurst
   }
+  when (io.out.req.fire) {
+    assert(io.out.req.bits.cmd =/= SimpleBusCmd.prefetch, "Crossbar does not support prefetch requests currently.")
+  }
 
   // Response channel processing
   (io.in zip dequeuedGrantVec.bits).foreach { case (inBus, grant) =>
     inBus.resp.valid := dequeuedGrantVec.valid && grant && io.out.resp.valid
     inBus.resp.bits := io.out.resp.bits
   }
-  io.out.resp.ready := Mux1H(dequeuedGrantVec.bits, io.in.map(_.resp.ready))
-  dequeuedGrantVec.ready := io.out.resp.fire && io.out.resp.bits.cmd =/= SimpleBusCmd.readBurst
-  // TODO: is burst read
+  // assert(!(io.out.resp.valid && !dequeuedGrantVec.valid), "Bus response is more advanced than grant vector.")
+  // io.out.resp.ready := dequeuedGrantVec.valid /*w*/ && Mux1H(dequeuedGrantVec.bits, io.in.map(_.resp.ready))
+  io.out.resp.ready := !dequeuedGrantVec.valid || Mux1H(dequeuedGrantVec.bits, io.in.map(_.resp.ready))
+  dequeuedGrantVec.ready := io.out.resp.fire && !(io.out.resp.bits.cmd === SimpleBusCmd.readBurst || io.out.resp.bits.cmd === SimpleBusCmd.writeBurst)
+  // io.out.resp.bits.cmd === SimpleBusCmd.writeBurst: temporary workaround for unexpected burst write response from L2$
 }
 
 class SimpleBusCrossbar(n: Int, addressSpace: List[List[(Long, Long)]]) extends Module {
