@@ -24,7 +24,6 @@ import top.Settings
 
 import chisel3._
 import chisel3.util.experimental.BoringUtils
-import utils.RetimingPipelineConnect
 
 trait HasSoCParameter {
   val EnableILA = Settings.get("EnableILA")
@@ -43,7 +42,7 @@ class ILABundle extends NutCoreBundle {
 
 class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParameter {
   val io = IO(new Bundle{
-    val mem = new AXI4(idBits = 1)
+    val mem = new AXI4(idBits = 0)
     val mmio = (if (p.FPGAPlatform) { new AXI4Lite } else { new SimpleBusUC })
     val frontend = Flipped(new AXI4)
     val meip = Input(UInt(Settings.getInt("NrExtIntr").W))
