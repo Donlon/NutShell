@@ -92,17 +92,12 @@ class SimpleBusCrossbarRRArbiter(n: Int) extends Module {
     hasRequest := reqValid.reduce(_ || _)
     val lastGrant = RegInit(1.U(n.W))
     val lastGrantRotated = Cat(lastGrant(n - 2, 0), lastGrant(n - 1))
+    val preGrant_n = VecInit(reqValid ++ reqValid).asUInt - lastGrantRotated
+    grantVec := Mux(wantsLock, VecInit(lastGrant.asBools), VecInit(Seq.tabulate(n)(i => reqValid(i) && !(preGrant_n(i) && preGrant_n(n + i)))))
 
-    val reqValidCat = VecInit(reqValid ++ reqValid).asUInt
-    val preGrant_n = (~reqValidCat).asUInt | (reqValidCat - lastGrantRotated)
-    grantVec := Mux(wantsLock, VecInit(lastGrant.asBools), VecInit(Seq.tabulate(n)(i => !(preGrant_n(i) && preGrant_n(n + i)))))
-
-    when(hasRequest && reqReady && !wantsLock) {
+    when(hasRequest && reqReady) {
       lastGrant := grantVec.asUInt
     }
-
-    reqValidCat.suggestName("reqValidCat")
-    preGrant_n.suggestName("preGrant_n")
   } else {
     grantVec := VecInit(true.B)
     hasRequest := reqValid(0)
